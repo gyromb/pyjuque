@@ -95,7 +95,8 @@ def simulateOrderInfo(exchange, order, kline_interval):
             if lowest_price <= order.price:
                 order_status['status'] = 'closed'
                 order_status['side'] = order.side
-                order_status['executedQty'] = order.original_quantity
+                order_status['info'] = dict()
+                order_status['info']['executedQty'] = order.original_quantity
                 break
         elif order.order_type == 'market':
             # not sure what to set this value to. 
@@ -103,18 +104,21 @@ def simulateOrderInfo(exchange, order, kline_interval):
             order.price = (candle['open'] + candle['close'])/2
             order_status['status'] = 'closed'
             order_status['side'] = order.side
-            order_status['executedQty'] = order.original_quantity
+            order_status['info'] = dict()
+            order_status['info']['executedQty'] = order.original_quantity
             break
         elif order.order_type == 'stop_loss':
             if lowest_price >= order.price:
                 order_status['status'] = 'closed'
                 order_status['side'] = order.side
-                order_status['executedQty'] = order.original_quantity
+                order_status['info'] = dict()
+                order_status['info']['executedQty'] = order.original_quantity
                 break
     if not order_status:
         order_status['status'] = 'open'
         order_status['side'] = order.side
-        order_status['executedQty'] = 0
+        order_status['info'] = dict()
+        order_status['info']['executedQty'] = 0
 
     order.last_checked_time = new_last_checked_time
     return order_status

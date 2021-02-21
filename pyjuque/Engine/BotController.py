@@ -70,6 +70,11 @@ class BotController:
             self.log('Error getting data from the exchange for {}:'.format(symbol))
             self.logError(sys.exc_info())
             return False, None
+
+        # mb: add the bot controller and the symbol to the strategy. It can be used to fetch more data if needed
+        self.strategy.symbol = symbol
+        self.strategy.bot_controller = self
+
         self.strategy.setUp(df)
         entry_signal = self.strategy.checkLongSignal(len(df) - 1)
         last_price = df.iloc[-1]['close']
@@ -135,9 +140,12 @@ class BotController:
                 self.logError(sys.exc_info())
                 return
         # update order params.
-        order.side = exchange_order_info['side']
-        order.status = exchange_order_info['status']
-        order.executed_quantity = exchange_order_info['filled']
+        order.side = exchange_order_info.get('side')
+        order.status = exchange_order_info.get('status')
+        info = exchange_order_info.get('info')
+        if info:
+            order.executed_quantity = float(info.get('executedQty'))
+
         if (order.side == 'buy'):
             # Order has been canceled by the user
             if (order.status == 'canceled'):

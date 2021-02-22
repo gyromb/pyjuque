@@ -282,17 +282,18 @@ class BotController:
     def tryExitOrder(self, order, pair):
         """ If strategy returns exit signal look to place exit order. """
         exit_signal, last_price = self.checkExitStrategy(order.symbol)
-        if self.bot_model.exit_settings.exit_on_signal and exit_signal:
-            quantity = self.computeMatchingOrderQuantity(order)
-            order_type = 'market'
-            side = 'sell'
-            if quantity > 0:
-                self.placeOrder(
-                    order.symbol, pair,
-                    order = order,
-                    quantity = quantity,
-                    side = side,
-                    order_type = order_type)
+        if self.bot_model.exit_settings.exit_on_signal:
+            if exit_signal:
+                quantity = self.computeMatchingOrderQuantity(order)
+                order_type = 'market'
+                side = 'sell'
+                if quantity > 0:
+                    self.placeOrder(
+                        order.symbol, pair,
+                        order = order,
+                        quantity = quantity,
+                        side = side,
+                        order_type = order_type)
         else:
             # Calculates quantity of order. 
             # Takes in to account partially filled orders.

@@ -92,7 +92,7 @@ class PNDStrategy(StrategyTemplate):
 bot_config = {
     # Name of the bot, as stored in the database
     'name': 'AdvancedBotTemplate',
-    'test_run': False,
+    'test_run': True,
 
     # exchange information (fill with your api key and secret)
     'exchange': {

@@ -21,6 +21,6 @@ class StrategyTemplate(ABC):
 
 
     @abstractmethod
-    def checkShortSignal(self, i):
+    def checkShortSignal(self, i, order):
         """ Checks whether we have a short signal """
         pass

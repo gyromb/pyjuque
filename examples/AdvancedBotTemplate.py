@@ -40,6 +40,7 @@ class PNDStrategy(StrategyTemplate):
     # for the signal
     def setUp(self, df):
         self.dataframe = df
+        open_orders = self.bot_controller.bot_model.getOpenOrders(self.bot_controller.session)
         nr_points = int(self.window_h * 60 / 15)
         self.df_15min = self.bot_controller.exchange.getOHLCV(self.symbol, '15m', limit=nr_points)
 
@@ -66,7 +67,7 @@ class PNDStrategy(StrategyTemplate):
         #     return False
         return True
 
-    def checkShortSignal(self, i=None):
+    def checkShortSignal(self, i=None, order=None):
         # if not self.buy_price:
         #     return False
         # df = self.dataframe

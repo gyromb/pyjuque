@@ -21,72 +21,94 @@ from pyjuque.Bot import defineBot
 from pyjuque.Strategies import StrategyTemplate
 
 ## Defines the strategy
-class PNDStrategy(StrategyTemplate):    
-    def __init__(self, profit=0.05, increase_profit=0.05, profit_margin=0.01, stop_loss=0.1, window_h=12, price_threshold=1.1, vol_threshold=10):
+class ProfitHuntStrategy(StrategyTemplate):
+    """ Bollinger Bands x RSI """
+    def __init__(self, profit=0.05, increase_profit=0.05, profit_margin=0.01, stop_loss=0.1, ema_width=25, ema_trigger=0.90, rsi_len=14, rsi_threshold=40):
         self.profit = profit
-        self.cur_profit = profit
         self.increase_profit = increase_profit
         self.profit_margin = profit_margin
         self.stop_loss = stop_loss
         self.buy_price = None
-        self.sell_price = None
+        self.rsi_len = rsi_len
+        self.rsi_threshold = rsi_threshold
 
-        self.window_h = window_h
-        self.price_threshold = 1.1
-        self.vol_threshold = 10
+        self.ema_width = ema_width
+        self.ema_trigger = ema_trigger
+        self.holding = True
 
-    # the bot will call this function with the latest data from the exchange 
+    def isHolding(self):
+        open_orders = self.bot_controller.bot_model.getOpenOrders(self.bot_controller.session)
+        for order in open_orders:
+            if not order.status or (order.status == 'closed' and order.executed_quantity > 0):
+                return True
+        return False
+
+    # the bot will call this function with the latest data from the exchange
     # passed through df; this function computes all the indicators needed
     # for the signal
-    def setUp(self, df):
+    def setUp(self, df, symbol):
         self.dataframe = df
-        open_orders = self.bot_controller.bot_model.getOpenOrders(self.bot_controller.session)
-        nr_points = int(self.window_h * 60 / 15)
-        self.df_15min = self.bot_controller.exchange.getOHLCV(self.symbol, '15m', limit=nr_points)
+        self.holding = self.isHolding()
+        if not self.holding:
+            self.df_15min = self.bot_controller.exchange.getOHLCV(symbol, '15m', limit=100)
 
-    # the bot will call this function with the latest data and if this 
+    # the bot will call this function with the latest data and if this
     # returns true, our bot will place an order
     def checkLongSignal(self, i = None):
-        # df = self.dataframe
-        # if i == None:
-        #     i = len(df) - 1
-        # i15 = len(self.df_15min)-1
-        # high = self.df_15min["high"][i15]
-        # price_increased = self.df_15min["close"][i15] - self.df_15min["close"][i15-1] > 0
-        # volume = self.df_15min["volume"][i15]
-        #
-        # av_price = self.df_15min["close"].mean()
-        # av_volume = self.df_15min["volume"].mean()
-        #
-        # price_over_threshold = high > self.price_threshold * av_price
-        # vol_over_threshold = volume > self.vol_threshold * av_volume
-        #
-        # if vol_over_threshold and not price_over_threshold and price_increased:
-        #     return True
-        # else:
-        #     return False
-        return True
+        if self.holding:
+            return False
+
+        df = self.dataframe
+        if i == None:
+            i = len(df) - 1
+
+        close = self.df_15min["close"].iloc[-1]
+        close_24h = self.df_15min["close"].iloc[len(self.df_15min) - 96]
+        change24h = close/close_24h
+
+        ema25 = ta.ema(self.df_15min['close'], 25)
+        ema50 = ta.ema(self.df_15min['close'], 50)
+        rsi = ta.rsi(self.df_15min['close'], self.rsi_len)
+        entry_signal = close <= ema25.iloc[-1]*self.ema_trigger and rsi.iloc[-1] <= self.rsi_threshold and ema50.iloc[-1] > ema25.iloc[-1]
+
+        if entry_signal:
+            self.holding = True
+
+        return entry_signal
 
     def checkShortSignal(self, i=None, order=None):
-        # if not self.buy_price:
-        #     return False
-        # df = self.dataframe
-        # if i == None:
-        #     i = len(df) - 1
-        # close = df["close"][i]
-        #
-        # if not self.sell_price:
-        #     self.sell_price = self.buy_price * (1-self.stop_loss)
-        #
-        # if close <= self.sell_price:
-        #     profit = close / self.buy_price
-        #     return True
-        #
-        # if close >= self.buy_price * (1+self.cur_profit):
-        #     self.cur_profit += self.increase_profit
-        #     self.sell_price = close * (1-self.profit_margin)
+        if not order:
+            return False
 
-        return True
+        df = self.dataframe
+        if i == None:
+            i = len(df) - 1
+        close = df["close"][i]
+
+        if not order.stop_price:
+            order.stop_price = float(order.price) * (1 - self.stop_loss)
+
+        if not order.take_profit_price:
+            order.take_profit_price = self.profit
+
+        buy_price = float(order.price)
+        sell_price = float(order.stop_price)
+        cur_profit = float(order.take_profit_price)
+
+        if close <= sell_price:
+            profit = close / order.price
+            return True
+
+        if close >= buy_price * (1 + cur_profit):
+            cur_profit = (close / float(order.price)) - 1
+            cur_profit += self.increase_profit
+            sell_price = close * (1 - self.profit_margin)
+
+            order.take_profit_price = cur_profit
+            order.stop_price = sell_price
+
+        self.bot_controller.session.commit()
+        return False
 
 
 ## Defines the overall configuration of the bot 
@@ -114,15 +136,16 @@ bot_config = {
     # this bot places an entry order when the 'checkLongSignal' function of 
     # the strategy below retruns true
     'strategy': {
-        'function': PNDStrategy,
+        'function': ProfitHuntStrategy,
         'params': {
             'profit': 0.05,
             'increase_profit': 0.05,
             'profit_margin': 0.01,
             'stop_loss': 0.1,
-            'window_h': 12,
-            'price_threshold': 1.1,
-            'vol_threshold': 10
+            'ema_width': 25,
+            'ema_trigger': 0.95,
+            'rsi_len': 14,
+            'rsi_threshold': 40
         },
     },
 
@@ -174,7 +197,7 @@ def Main():
             if os.path.isfile('./AdvancedBotTemplate.db'):
                 os.remove('./AdvancedBotTemplate.db')
         
-        time.sleep(60)
+        time.sleep(1)
 
 if __name__ == '__main__':
     Main()

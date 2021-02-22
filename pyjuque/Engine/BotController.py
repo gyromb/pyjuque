@@ -35,6 +35,10 @@ class BotController:
         active_pairs = self.bot_model.getActivePairs(self.session)
         self.log("Number of active_pairs: {}".format(
                 len(active_pairs)), should_print=False)
+
+        # mb: add the bot controller and the symbol to the strategy. It can be used to fetch more data if needed
+        self.strategy.bot_controller = self
+
         # Step 2 For each pair:
         #	Retreive current market data
         # 	Compute indicators & check if strategy
@@ -71,11 +75,7 @@ class BotController:
             self.logError(sys.exc_info())
             return False, None
 
-        # mb: add the bot controller and the symbol to the strategy. It can be used to fetch more data if needed
-        self.strategy.symbol = symbol
-        self.strategy.bot_controller = self
-
-        self.strategy.setUp(df)
+        self.strategy.setUp(df, symbol)
         entry_signal = self.strategy.checkLongSignal(len(df) - 1)
         last_price = df.iloc[-1]['close']
         return entry_signal, last_price
@@ -273,7 +273,7 @@ class BotController:
             self.log('Error getting data from the exchange for {}:'.format(symbol))
             self.logError(sys.exc_info())
             return False, None
-        self.strategy.setUp(df)
+        self.strategy.setUp(df, symbol)
         exit_signal = self.strategy.checkShortSignal(len(df) - 1, order)
         last_price = df.iloc[-1]['close']
         return exit_signal, last_price
@@ -282,17 +282,18 @@ class BotController:
     def tryExitOrder(self, order, pair):
         """ If strategy returns exit signal look to place exit order. """
         exit_signal, last_price = self.checkExitStrategy(order.symbol, order)
-        if self.bot_model.exit_settings.exit_on_signal and exit_signal:
-            quantity = self.computeMatchingOrderQuantity(order)
-            order_type = 'market'
-            side = 'sell'
-            if quantity > 0:
-                self.placeOrder(
-                    order.symbol, pair,
-                    order = order,
-                    quantity = quantity,
-                    side = side,
-                    order_type = order_type)
+        if self.bot_model.exit_settings.exit_on_signal:
+            if exit_signal:
+                quantity = self.computeMatchingOrderQuantity(order)
+                order_type = 'market'
+                side = 'sell'
+                if quantity > 0:
+                    self.placeOrder(
+                        order.symbol, pair,
+                        order = order,
+                        quantity = quantity,
+                        side = side,
+                        order_type = order_type)
         else:
             # Calculates quantity of order. 
             # Takes in to account partially filled orders.

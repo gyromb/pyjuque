@@ -7,7 +7,7 @@ class StrategyTemplate(ABC):
     df = None
 
     @abstractmethod
-    def setUp(self, df):
+    def setUp(self, df, symbol):
         """ Computes the indicators for the given dataframe 
         (usually gets called by the bot controller when recent candlestick 
         data is received from the exchange)"""

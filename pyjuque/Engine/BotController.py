@@ -24,6 +24,8 @@ class BotController:
         self.kline_interval = '5m'
         self.status_printer = status_printer
         self.logger_on = logger_on
+        self.disable_entry = False
+        self.disable_exit = False
 
 
     def executeBot(self):
@@ -43,10 +45,11 @@ class BotController:
         #	Retreive current market data
         # 	Compute indicators & check if strategy
         #		If strategy fulfilled, palce order & save order in DB
-        self.log("Checking signals on pairs...", should_print=False)
-        for pair in active_pairs:
-            self.log("Checking signal on {}".format(pair.symbol), should_print=False)
-            self.tryEntryOrder(pair)
+        if not self.disable_entry:
+            self.log("Checking signals on pairs...", should_print=False)
+            for pair in active_pairs:
+                self.log("Checking signal on {}".format(pair.symbol), should_print=False)
+                self.tryEntryOrder(pair)
         # Step 3: Retreive all open orders on the bot
         self.log("Getting open orders:", should_print=False)
         open_orders = self.bot_model.getOpenOrders(self.session)
@@ -57,9 +60,10 @@ class BotController:
         #           -> If entry order, place exit order
         #           -> If exit order, success (take profit), 
         #           or failure (stop loss): Resume trading!
-        self.log("Checking orders state...", should_print=False)
-        for order in open_orders:
-            self.updateOpenOrder(order)
+        if not self.disable_exit:
+            self.log("Checking orders state...", should_print=False)
+            for order in open_orders:
+                self.updateOpenOrder(order)
         
         self.log("Executed the bot loop. Now waiting...", should_print=False)
 

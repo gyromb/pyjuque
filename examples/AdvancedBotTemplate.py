@@ -72,6 +72,7 @@ class ProfitHuntStrategy(StrategyTemplate):
         entry_signal = close <= ema25.iloc[-1]*self.ema_trigger and rsi.iloc[-1] <= self.rsi_threshold and ema50.iloc[-1] > ema25.iloc[-1]
 
         if entry_signal:
+            self.bot_controller.disable_entry = True
             self.holding = True
 
         return entry_signal
@@ -97,6 +98,7 @@ class ProfitHuntStrategy(StrategyTemplate):
 
         if close <= sell_price:
             profit = close / order.price
+            self.bot_controller.disable_entry = False
             return True
 
         if close >= buy_price * (1 + cur_profit):
